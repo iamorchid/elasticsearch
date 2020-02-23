@@ -86,7 +86,7 @@ public class ClusterBootstrapService {
             }
             if (DiscoveryNode.isMasterNode(settings) == false) {
                 throw new IllegalArgumentException("node with [" + DiscoveryModule.DISCOVERY_TYPE_SETTING.getKey() + "] set to [" +
-                    DiscoveryModule.SINGLE_NODE_DISCOVERY_TYPE +  "] must be master-eligible");
+                    DiscoveryModule.SINGLE_NODE_DISCOVERY_TYPE + "] must be master-eligible");
             }
             bootstrapRequirements = Collections.singleton(Node.NODE_NAME_SETTING.get(settings));
             unconfiguredBootstrapTimeout = null;
@@ -116,7 +116,7 @@ public class ClusterBootstrapService {
         if (bootstrappingPermitted.get() && transportService.getLocalNode().isMasterNode() && bootstrapRequirements.isEmpty() == false
             && isBootstrappedSupplier.getAsBoolean() == false) {
 
-            final Tuple<Set<DiscoveryNode>,List<String>> requirementMatchingResult;
+            final Tuple<Set<DiscoveryNode>, List<String>> requirementMatchingResult;
             try {
                 requirementMatchingResult = checkRequirements(nodes);
             } catch (IllegalStateException e) {
@@ -218,7 +218,7 @@ public class ClusterBootstrapService {
             || discoveryNode.getAddress().getAddress().equals(requirement);
     }
 
-    private Tuple<Set<DiscoveryNode>,List<String>> checkRequirements(Set<DiscoveryNode> nodes) {
+    private Tuple<Set<DiscoveryNode>, List<String>> checkRequirements(Set<DiscoveryNode> nodes) {
         final Set<DiscoveryNode> selectedNodes = new HashSet<>();
         final List<String> unmatchedRequirements = new ArrayList<>();
         for (final String bootstrapRequirement : bootstrapRequirements) {
@@ -227,6 +227,7 @@ public class ClusterBootstrapService {
 
             if (matchingNodes.size() == 0) {
                 unmatchedRequirements.add(bootstrapRequirement);
+                continue;
             }
 
             if (matchingNodes.size() > 1) {

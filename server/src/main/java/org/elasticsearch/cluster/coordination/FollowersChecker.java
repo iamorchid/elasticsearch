@@ -278,6 +278,10 @@ public class FollowersChecker {
             this.discoveryNode = discoveryNode;
         }
 
+        /**
+         * 如果当前follower因为各种原因而被移出followerCheckers，则意味着
+         * 可以不用继续对这个follower进行check了。
+         */
         private boolean running() {
             return this == followerCheckers.get(discoveryNode);
         }

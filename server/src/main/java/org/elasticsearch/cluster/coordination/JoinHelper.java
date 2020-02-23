@@ -111,7 +111,11 @@ public class JoinHelper {
                 // check it here on a best-effort basis. This is fine because a concurrent change indicates the existence of another leader
                 // in a higher term which will cause this node to stand down.
 
-                final long currentTerm = currentTermSupplier.getAsLong();
+                /**
+                 * 这里在publish集群状态之前，先更新进群的term。尽管，这里更新之后，current term还有可能继续改变。
+                 * 但没关系，在真正发布集群状态之前，还会再进行校验（见Coordinator#publish）。
+                 */
+               final long currentTerm = currentTermSupplier.getAsLong();
                 if (currentState.term() != currentTerm) {
                     final CoordinationMetaData coordinationMetaData =
                             CoordinationMetaData.builder(currentState.coordinationMetaData()).term(currentTerm).build();

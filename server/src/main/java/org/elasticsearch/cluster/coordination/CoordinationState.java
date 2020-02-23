@@ -168,6 +168,15 @@ public class CoordinationState {
      * @throws CoordinationStateRejectedException if the arguments were incompatible with the current state of this object.
      */
     public Join handleStartJoin(StartJoinRequest startJoinRequest) {
+        /**
+         * 这里有个奇怪的地方，在当前节点进行投票时，只判断新一轮选举的term是否大于当前持有的term，
+         * 而不判断发起投票的节点是否具有不旧于自己的集群信息(具体判读逻辑在handleJoin函数中，由发
+         * 起选举的节点处理, 为何不选择在此处判断了？)。
+         *
+         * 同时，如果进行投票，则更新当前持有的term（表示加入该term时期的选举）。如果另一个节点
+         * 以相同term也进行选举，则会被拒绝。因此，这里可以确保一个节点对相同的term只投票一次。
+         */
+
         if (startJoinRequest.getTerm() <= getCurrentTerm()) {
             logger.debug("handleStartJoin: ignoring [{}] as term provided is not greater than current term [{}]",
                 startJoinRequest, getCurrentTerm());
@@ -219,11 +228,19 @@ public class CoordinationState {
                 "incoming term " + join.getTerm() + " does not match current term " + getCurrentTerm());
         }
 
+        /**
+         * 候选主节点在处理其他节点对投票请求的相应结果之前，必须自己先对自己进行投票（即handleStartJoin）。
+         * 因此，Coordinator#startElection会先将投票请求发给自己。
+         */
         if (startedJoinSinceLastReboot == false) {
             logger.debug("handleJoin: ignored join as term was not incremented yet after reboot");
             throw new CoordinationStateRejectedException("ignored join as term has not been incremented yet after reboot");
         }
 
+        /**
+         * 已下两个检查确保候选主节点不会有比要加入的节点有更旧状态，如果确实更旧的话，则意味着当前要加入的节点
+         * 不会选举自己作为master （这段逻辑为啥不由要加入的节点处理，即放在handleStartJoin ？？？）。
+         */
         final long lastAcceptedTerm = getLastAcceptedTerm();
         if (join.getLastAcceptedTerm() > lastAcceptedTerm) {
             logger.debug("handleJoin: ignored join as joiner has a better last accepted term (expected: <=[{}], actual: [{}])",

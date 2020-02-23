@@ -178,6 +178,12 @@ public class PreVoteCollector {
                 return;
             }
 
+            /**
+             * 通過下面的邏輯可以看到，在處理PreVoteResponse過程中，並不會將response中的term
+             * 作爲判斷條件，而是考慮本節點的持有的ClusterState信息是否足夠新。
+             *
+             * 当然，这里会记录系统中看到的最大term，在选举开始时，用于生成下一次的term。
+             */
             updateMaxTermSeen.accept(response.getCurrentTerm());
 
             if (response.getLastAcceptedTerm() > clusterState.term()

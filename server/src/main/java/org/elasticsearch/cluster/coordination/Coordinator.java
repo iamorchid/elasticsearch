@@ -1010,6 +1010,11 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     public void publish(ClusterChangedEvent clusterChangedEvent, ActionListener<Void> publishListener, AckListener ackListener) {
         try {
             synchronized (mutex) {
+                /**
+                 * 执行ClusterStateTaskExecutor时，mutex并不会被持有。因此，在ClusterStateTaskExecutor执行结束后，
+                 * 有可能已不再是leader或者current term发生变动（要发布的ClusterState中的term已老旧）。对于这种情况，
+                 * 需要放弃本次集群状态发布。
+                 */
                 if (mode != Mode.LEADER || getCurrentTerm() != clusterChangedEvent.state().term()) {
                     logger.debug(() -> new ParameterizedMessage("[{}] failed publication as node is no longer master for term {}",
                         clusterChangedEvent.source(), clusterChangedEvent.state().term()));
