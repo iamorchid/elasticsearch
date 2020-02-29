@@ -59,6 +59,16 @@ public class ReplicationGroup {
                         "in-sync shard copy but not tracked: " + shard;
                     skippedShards.add(shard);
                 }
+
+                /**
+                 * relocating target shard和其他replica shard一样，会先通过primary进行recover。同时
+                 * 在replica recover过程中，primary会将它加入tracked队列，以便可以将新的操作同步到处
+                 * 于recover过程中的replica。
+                 *
+                 * 但对于relocating target shard，这里有一个问题，因为IndexShardRoutingTable不会保留
+                 * 它的ShardRouting (见RoutingTable#Builder的updateNodes操作)。因此，这里需要通过
+                 * relocating source shard来判断是否存在relocating target的存在。
+                 */
                 if (shard.relocating()) {
                     ShardRouting relocationTarget = shard.getTargetRelocatingShard();
                     if (trackedAllocationIds.contains(relocationTarget.allocationId().getId())) {

@@ -360,6 +360,10 @@ public class IndexNameExpressionResolver {
      * <b>NOTE</b>: The provided expressions must have been resolved already via {@link #resolveExpressions}.
      */
     public String[] filteringAliases(ClusterState state, String index, Set<String> resolvedExpressions) {
+        /**
+         * 这里的逻辑主要是用来生成alias filter的，如果resolvedExpressions包含了index name本身或者没有filter
+         * 的alias，则不需要生成任何alias filter（即返回null），因为需要返回索引的全集。
+         */
         return indexAliases(state, index, AliasMetaData::filteringRequired, false, resolvedExpressions);
     }
 
