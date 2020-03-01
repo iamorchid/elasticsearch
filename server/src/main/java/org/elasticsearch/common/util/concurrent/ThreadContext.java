@@ -177,8 +177,34 @@ public final class ThreadContext implements Writeable {
      * @param preserveResponseHeaders if set to <code>true</code> the response headers of the restore thread will be preserved.
      */
     public StoredContext newStoredContext(boolean preserveResponseHeaders) {
+        // 记录当前调用线程（这里通常为父线程）的context
         final ThreadContextStruct context = threadLocal.get();
+
         return ()  -> {
+            /**
+             * 执行这里操作的线程，可以为和调用newStoredContext相同的线程，也可以为其他线程（子线程）。
+             * 如果和调用newStoredContext的线程相同，则StoredContext.close()恢复之前的context，比如
+             * try(ThreadContext.StoredContext ignored = currentContext.newStoredContext(false)) {
+             *   // do ops to change currentContext
+             * }
+             * // currentContext is recovered here
+             *
+             * 如果和调用newStoredContext的线程不同，则StoredContext.restore()继承父线程的context, 比如
+             * ThreadContext.StoredContext parentContext = threadContext.newStoredContext(false);
+             * executor.execute(() -> {
+             *   try(ThreadContext.StoredContext ignored = threadContext.newStoredContext(false)) {
+             *     parentContext.restore();
+             *     // perform ops ...
+             *   }
+             * });
+             * 或者更简单的形式，比如
+             * Supplier<ThreadContext.StoredContext> restorable = threadContext.newRestorableContext(false);
+             * executor.execute(() -> {
+             *   try(ThreadContext.StoredContext ignored = restorable.get()) {
+             *     // perform ops ...
+             *   }
+             * });
+             */
             if (preserveResponseHeaders && threadLocal.get() != context) {
                 threadLocal.set(context.putResponseHeaders(threadLocal.get().responseHeaders));
             } else {
@@ -625,6 +651,10 @@ public final class ThreadContext implements Writeable {
         @Override
         public void run() {
             try (ThreadContext.StoredContext ignore = stashContext()){
+                /**
+                 * 将线程池之外记录的的context应用到线程池中的线程，即实现context的继承，
+                 * 也可以看{@link ThreadContext#wrapRestorable(StoredContext)}。
+                 */
                 ctx.restore();
                 in.run();
             }

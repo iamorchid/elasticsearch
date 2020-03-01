@@ -270,6 +270,10 @@ public abstract class TransportReplicationAction<
         @Override
         protected void doRun() throws Exception {
             final ShardId shardId = primaryRequest.getRequest().shardId();
+
+            /**
+             * 如果请求的索引或者shard id在当前节点不存在，则会扔出异常。
+             */
             final IndexShard indexShard = getIndexShard(shardId);
             final ShardRouting shardRouting = indexShard.routingEntry();
             // we may end up here if the cluster state used to route the primary is so stale that the underlying
