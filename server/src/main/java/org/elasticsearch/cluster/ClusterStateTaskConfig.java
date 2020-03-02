@@ -32,6 +32,9 @@ public interface ClusterStateTaskConfig {
      * timeout, the associated {@link ClusterStateTaskListener#onFailure(String, Exception)}
      * is invoked.
      *
+     * 注意：这里要求task在submit之后，必须在timeout范围内被调度处理，并不是要求该task
+     * 在submit之后，在timeout范围内执行完成。
+     *
      * @return the timeout, or null if one is not set
      */
     @Nullable

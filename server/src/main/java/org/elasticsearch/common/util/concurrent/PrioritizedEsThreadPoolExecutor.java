@@ -125,6 +125,10 @@ public class PrioritizedEsThreadPoolExecutor extends EsThreadPoolExecutor {
         execute(command);
         if (timeout.nanos() >= 0) {
             if (command instanceof TieBreakingPrioritizedRunnable) {
+                /**
+                 * 这里会启动一个定时器，如果在timeout范围内，command还没有被线程池调度执行，那么它
+                 * 会被从线程池的pending队列中删除（即不会被执行），并调用timeoutCallback。
+                 */
                 ((TieBreakingPrioritizedRunnable) command).scheduleTimeout(timer, timeoutCallback, timeout);
             } else {
                 // We really shouldn't be here. The only way we can get here if somebody created PrioritizedFutureTask

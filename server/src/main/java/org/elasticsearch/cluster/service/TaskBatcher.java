@@ -26,13 +26,7 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.EsRejectedExecutionException;
 import org.elasticsearch.common.util.concurrent.PrioritizedEsThreadPoolExecutor;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -97,6 +91,14 @@ public abstract class TaskBatcher {
             }
         }
         if (toRemove.isEmpty() == false) {
+            /**
+             * toRemove不为空，只表示存在某些task尚未被处理，但并不一定表示这些task没有被线程池中的其他线
+             * 程取走（并稍后执行），这里需要进一步判断。
+             * a) 如果tasksPerBatchingKey.get(batchingKey)不为空且包含包含toRemove（注意，这里的包含
+             * 关系必定包含所有toRemove中items，同时还有可能包含其他具有相同batchingKey的items），则
+             * toRemove一定没有被其他线程取走。
+             * b) 否则，tasksPerBatchingKey.get(batchingKey)一定不包含toRemove中的任意一个item。
+             */
             BatchedTask firstTask = toRemove.get(0);
             Object batchingKey = firstTask.batchingKey;
             assert tasks.stream().allMatch(t -> t.batchingKey == batchingKey) :
@@ -104,6 +106,7 @@ public abstract class TaskBatcher {
             synchronized (tasksPerBatchingKey) {
                 LinkedHashSet<BatchedTask> existingTasks = tasksPerBatchingKey.get(batchingKey);
                 if (existingTasks != null) {
+                    // 注意，这里的existingTasks可能包含toRemove的所有items，或者一个也不包含。
                     existingTasks.removeAll(toRemove);
                     if (existingTasks.isEmpty()) {
                         tasksPerBatchingKey.remove(batchingKey);
