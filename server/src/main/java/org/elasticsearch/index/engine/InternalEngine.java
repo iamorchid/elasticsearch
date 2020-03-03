@@ -1602,6 +1602,16 @@ public class InternalEngine extends Engine {
          *
          * This method is to maintain translog only, thus IndexWriter#hasUncommittedChanges condition is not considered.
          */
+        /**
+         * 这里的逻辑是保证每次commit后，新commit对应的generation（基于该generation进行recover）总是
+         * 递增的，否则容易出现shouldPeriodicallyFlush总为真，造成不必要的无休止的flush操作。
+         *
+         * 这里其实并不需要考虑translogGenerationOfLastCommit是否等于translogGenerationOfNewCommit
+         * 其中，translogGenerationOfLastCommit <= translogGenerationOfNewCommit肯定成立。只要当前
+         * processed checkpoint等于max seq_no，则下一次commit对应的generation肯定是新的被roll过的
+         * generation（自然大于translogGenerationOfLastCommit）。而统计新的需要flush的字节，也是从
+         * 该新的generation对应translog，不肯能造成无休止触发shouldPeriodicallyFlush。
+         */
         final long translogGenerationOfNewCommit =
             translog.getMinGenerationForSeqNo(localCheckpointTracker.getProcessedCheckpoint() + 1).translogFileGeneration;
         return translogGenerationOfLastCommit < translogGenerationOfNewCommit

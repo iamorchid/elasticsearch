@@ -278,7 +278,7 @@ public abstract class TransportWriteAction<
                 pendingOps.incrementAndGet();
             }
             this.logger = logger;
-            assert pendingOps.get() >= 0 && pendingOps.get() <= 3 : "pendingOpts was: " + pendingOps.get();
+            assert pendingOps.get() >= 1 && pendingOps.get() <= 3 : "pendingOpts was: " + pendingOps.get();
         }
 
         /** calls the response listener if all pending operations have returned otherwise it just decrements the pending opts counter.*/
@@ -294,6 +294,12 @@ public abstract class TransportWriteAction<
             assert numPending >= 0 && numPending <= 2: "numPending must either 2, 1 or 0 but was " + numPending ;
         }
 
+        /**
+         * 这里需要清楚的区分refresh和sync操作的区别。
+         * refresh：保证更新能够被search到
+         * sync: 对translog进行刷盘，同时推进persisted local checkpoint。对于replica而言，它返回给
+         *       primary的persisted local checkpoint，可以让primary推进global checkpoint。
+         */
         void run() {
             /*
              * We either respond immediately (i.e., if we do not fsync per request or wait for
