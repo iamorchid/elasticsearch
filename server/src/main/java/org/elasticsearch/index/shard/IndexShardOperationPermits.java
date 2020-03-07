@@ -151,11 +151,14 @@ final class IndexShardOperationPermits implements Closeable {
         });
     }
 
+    // 如果后续有新的操作获取permit，则该操作将会被delay，这是通过设置增加queuedBlockOperations实现，
+    // 因为每个block operation要求独占所有的permit。
     private void delayOperations() {
         if (closed) {
             throw new IndexShardClosedException(shardId);
         }
         synchronized (this) {
+            // 此处语义表示如果queuedBlockOperations为0，则可定没有被delay的操作
             assert queuedBlockOperations > 0 || delayedOperations.isEmpty();
             queuedBlockOperations++;
         }

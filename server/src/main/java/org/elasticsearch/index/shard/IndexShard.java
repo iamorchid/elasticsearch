@@ -529,6 +529,16 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                     if (resyncStarted == false) {
                         throw new IllegalStateException("cannot start resync while it's already in progress");
                     }
+
+                    /**
+                     * 这里的操作必须极为谨慎，在处理操作序列<old1,old2,bump,new1,new2>，须保证进行bump之前，已有的操
+                     * 作<old1,old2>在没有切换为primary状态和bump primaryterm之前完成，而<new1,new2>则在切换为
+                     * primary和bump term之后完成。
+
+                     * 下面的bumpPrimaryTerm中的runnable，会在诸如<old1,old2>之类的已有操作完成后，才会执行，且相对于
+                     * 调用bumpPrimaryTerm的线程来说，是异步的。因此，需要通过同步机制，保证在完成<old1,old2>之后且调
+                     * 用该runnable之前，切换为primary状态和bump term。
+                     */
                     bumpPrimaryTerm(newPrimaryTerm,
                         () -> {
                             shardStateUpdated.await();
@@ -537,6 +547,11 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                                 ", current routing: " + currentRouting + ", new routing: " + newRouting;
                             assert getOperationPrimaryTerm() == newPrimaryTerm;
                             try {
+                                /**
+                                 * 注意，这里的逻辑并不一定会更新global checkpoint。如果集群中还有其他in-sync的replicas，则上面调
+                                 * 用updateFromMaster后，这些in-sync replicas的local checkpoint会设置为UNASSIGNED_SEQ_NO，则在
+                                 * 计算global checkpoint时，会继续使用前一任primary维护的global checkpoint。
+                                 */
                                 replicationTracker.activatePrimaryMode(getLocalCheckpoint());
                                 ensurePeerRecoveryRetentionLeasesExist();
                                 /*
@@ -2934,8 +2949,16 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                         logger.info("detected new primary with primary term [{}], global checkpoint [{}], max_seq_no [{}]",
                             opPrimaryTerm, currentGlobalCheckpoint, maxSeqNo);
                         if (currentGlobalCheckpoint < maxSeqNo) {
+                            // 这里说明当前replica可能包含当前primary上没有的操作，需要revert掉这些操作以保证同primary
+                            // 完成resync后，他们的状态是一致的。因此，这里可以看到，假设某个primary挂掉后，在重新进行
+                            // replica的promote后，seqNo大于global checkpoint之后的哪些操作保留及丢弃，是不确定的。
+                            // 这个需要看最终那个replica被promote为新的primary。但有一点可以确定，即promote结束后，所有
+                            // copies之间的状态在resync之后是一致的。
                             resetEngineToGlobalCheckpoint();
                         } else {
+                            // 这种情况只可能发生在currentGlobalCheckpoint，localCheckpoint（persisted）和maxSeqNo三者相同。
+                            // 因为updateGlobalCheckpointOnReplica确保currentGlobalCheckpoint <= localCheckpoint,而同时
+                            // localCheckpoint <= maxSeqNo。
                             getEngine().rollTranslogGeneration();
                         }
                     }, allowCombineOperationWithPrimaryTermUpdate ? operationListener : null);
@@ -2947,8 +2970,16 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 }
             }
         }
+
+        /**
+         * 此处opPrimaryTerm小于pendingPrimaryTerm仅发生在当前的replica被promote为primary，且没来得及bump primary
+         * term （IndexShard中的bumpPrimaryTerm操作是bump pendingPrimaryTerm，然后再异步完成operation term的bump）。
+         * 因此，这里的操作可能是来自上任primary尚未处理的replication操作，该操作仍然是合法的，需要被未正式成为新primary
+         * 的replica接受并处理。
+         */
         assert opPrimaryTerm <= pendingPrimaryTerm
             : "operation primary term [" + opPrimaryTerm + "] should be at most [" + pendingPrimaryTerm + "]";
+
         operationExecutor.accept(operationListener);
     }
 
