@@ -57,6 +57,11 @@ public enum VersionType implements Writeable {
             return "current version [" + currentVersion + "] is different than the one provided [" + expectedVersion + "]";
         }
 
+        /**
+         * 这里的deleted可以表示为：
+         * 1. 文档没有找到，此时currentVersion为Versions.NOT_FOUND
+         * 2. 文档最近被删除，此时currentVersion为文档删除时对应的version
+         */
         private boolean isVersionConflict(long currentVersion, long expectedVersion, boolean deleted) {
             if (expectedVersion == Versions.MATCH_ANY) {
                 return false;

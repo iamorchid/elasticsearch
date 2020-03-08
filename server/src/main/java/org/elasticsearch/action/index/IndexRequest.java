@@ -499,6 +499,9 @@ public class IndexRequest extends ReplicatedWriteRequest<IndexRequest> implement
      * Resolves the version based on operation type {@link #opType()}.
      */
     private long resolveVersionDefaults() {
+        // 对于CREATE操作来说，doc id可以提供或不提供。若提供doc id，则不能存在已有的的文档（或者已有的文档被删除），即
+        // Versions.MATCH_DELETED所描述的含义。同时，使用opType为CREATE的IndexRequest请求时，不能显示设置version，
+        // 否则校验会失败(本身也讲不通，创建文档时的version应由ES自动初始化)。
         if (opType == OpType.CREATE && version == Versions.MATCH_ANY) {
             return Versions.MATCH_DELETED;
         } else {

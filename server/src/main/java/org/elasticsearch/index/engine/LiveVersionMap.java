@@ -88,6 +88,7 @@ final class LiveVersionMap implements ReferenceManager.RefreshListener, Accounta
             return unsafe;
         }
 
+        // 这里mark成unsafe后，就一直是unsafe，直到refresh时进行transition
         void markAsUnsafe() {
             unsafe = true;
         }
@@ -307,6 +308,13 @@ final class LiveVersionMap implements ReferenceManager.RefreshListener, Accounta
 
     /**
      * Adds this uid/version to the pending adds map iff the map needs safe access.
+     *
+     * unsafe access mode其实一种新能优化，因为我们知道如果每个文档对是自动分配doc id时，ES并不需要依赖于version map
+     * 进行版本冲突校验，因此就没有必要将新文档的索引信息保存到version map中（这可能会消耗不少内存）。
+     *
+     * 但处于unsafe mode时，如果需要用到version map时，咋办？可以先调用{@link LiveVersionMap#enforceSafeAccess()},
+     * 确保新的索引会被让入version map，并触发refresh。因此，对于已索引过的文档，即使version map中找不到某个doc id的
+     * 版本信息，也可以从Lucene中找到。
      */
     void maybePutIndexUnderLock(BytesRef uid, IndexVersionValue version) {
         assert assertKeyedLockHeldByCurrentThread(uid);
@@ -317,6 +325,8 @@ final class LiveVersionMap implements ReferenceManager.RefreshListener, Accounta
             // Even though we don't store a record of the indexing operation (and mark as unsafe),
             // we should still remove any previous delete for this uuid (avoid accidental accesses).
             // Not this should not hurt performance because the tombstone is small (or empty) when unsafe is relevant.
+            // 这里有个问题，可不可能从tombstone中删除文档版本更大的处于soft delete状态的文档呢？
+            // 不可能，因为这个操作仅在plan.indexIntoLucene发生，因此不可能是stale操作。
             removeTombstoneUnderLock(uid);
             maps.current.markAsUnsafe();
             assert putAssertionMap(uid, version);
