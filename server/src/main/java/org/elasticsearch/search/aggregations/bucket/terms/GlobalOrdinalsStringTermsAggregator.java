@@ -109,6 +109,7 @@ public class GlobalOrdinalsStringTermsAggregator extends AbstractStringTermsAggr
 
     private void collectGlobalOrd(int doc, long globalOrd, LeafBucketCollector sub) throws IOException {
         if (bucketOrds == null) {
+            // 注意getLeafCollector中，会事先对docCounts进行grow
             collectExistingBucket(sub, doc, globalOrd);
         } else {
             long bucketOrd = bucketOrds.add(globalOrd);

@@ -124,13 +124,18 @@ public class ReplicationOperation<
             // of the sampled replication group, and advanced further than what the given replication group would allow it to.
             // This would entail that some shards could learn about a global checkpoint that would be higher than its local checkpoint.
             final long globalCheckpoint = primary.computedGlobalCheckpoint();
+
             // we have to capture the max_seq_no_of_updates after this request was completed on the primary to make sure the value of
             // max_seq_no_of_updates on replica when this request is executed is at least the value on the primary when it was executed
             // on.
+            // replica会基于这个判断是否能对index操作进行append-only优化，这个必须是在replication操作
+            // 时，返回primary当前的最新maxSeqNoOfUpdatesOrDeletes值。
             final long maxSeqNoOfUpdatesOrDeletes = primary.maxSeqNoOfUpdatesOrDeletes();
+
             assert maxSeqNoOfUpdatesOrDeletes != SequenceNumbers.UNASSIGNED_SEQ_NO : "seqno_of_updates still uninitialized";
             final ReplicationGroup replicationGroup = primary.getReplicationGroup();
             markUnavailableShardsAsStale(replicaRequest, replicationGroup);
+
             performOnReplicas(replicaRequest, globalCheckpoint, maxSeqNoOfUpdatesOrDeletes, replicationGroup);
         }
         primaryResult.runPostReplicationActions(new ActionListener<>() {
