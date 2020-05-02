@@ -135,6 +135,14 @@ final class LiveVersionMap implements ReferenceManager.RefreshListener, Accounta
 
         boolean shouldInheritSafeAccess() {
             final boolean mapHasNotSeenAnyOperations = current.isEmpty() && current.isUnsafe() == false;
+            /**
+             * 其实这里的逻辑很简单, 在进行transition之前(current->old), 如果当前current中有任何操作（即current.isEmpty()为false,
+             * 这时needsSafeAccess肯定为true, 见{@link LiveVersionMap#maybePutIndexUnderLock(BytesRef, IndexVersionValue)};
+             * 或者current.isUnsafe()为true, 此时needsSafeAccess可能为true或者false), 则根据当前的needsSafeAccess来决定。否则,
+             * 如果current尚未有任何操作, 则继承上一次看到的safe access mode。
+             *
+             * 注意, safe access的值本身不会影响正确性。 当safe access为false，可以进行适当优化，即不需要将索引操作存入version map中。
+             */
             return needsSafeAccess
                 // we haven't seen any ops and map before needed it so we maintain it
                 || (mapHasNotSeenAnyOperations && previousMapsNeededSafeAccess);

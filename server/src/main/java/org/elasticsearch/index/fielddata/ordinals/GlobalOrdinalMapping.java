@@ -37,11 +37,16 @@ final class GlobalOrdinalMapping extends SortedSetDocValues {
     private final LongValues mapping;
     private final TermsEnum[] lookups;
 
+    /**
+     * 注意values来自于segmentIndex对应的LeafReaderContext (即Lucene的segment)。
+     */
     GlobalOrdinalMapping(OrdinalMap ordinalMap, SortedSetDocValues values, TermsEnum[] lookups, int segmentIndex) {
         super();
         this.values = values;
         this.lookups = lookups;
         this.ordinalMap = ordinalMap;
+
+        // 获取segment中局部ordinal到全局ordinal的映射
         this.mapping = ordinalMap.getGlobalOrds(segmentIndex);
     }
 
@@ -71,8 +76,16 @@ final class GlobalOrdinalMapping extends SortedSetDocValues {
 
     @Override
     public BytesRef lookupOrd(long globalOrd) throws IOException {
+        /**
+         * 注意这里的readerIndex并不一定和segmentIndex相同，而下面的segmentOrd是readerIndex对应的
+         * LeafReaderContext (Lucene segment)下ordinal。这也是GlobalOrdinalMapping为何需要依赖
+         * 所有LeafReaderContext的TermsEnum，而不仅仅是segmentIndex对应的LeafReaderContext相关的
+         * TermsEnum。这个主要和OrdinalMap的实现有关， 因为OrdinalMap本身没有实现lookup global
+         * ordinal的功能。
+         */
         final long segmentOrd = ordinalMap.getFirstSegmentOrd(globalOrd);
         int readerIndex = ordinalMap.getFirstSegmentNumber(globalOrd);
+
         lookups[readerIndex].seekExact(segmentOrd);
         return lookups[readerIndex].term();
     }

@@ -251,19 +251,30 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         final Set<String> leaseIdsForCurrentPeers
             = routingTable.assignedShards().stream().map(ReplicationTracker::getPeerRecoveryRetentionLeaseId).collect(Collectors.toSet());
         final boolean allShardsStarted = routingTable.allShardsStarted();
+        // allShardsStarted为true时，minimumReasonableRetainedSeqNo并不会被用到
         final long minimumReasonableRetainedSeqNo = allShardsStarted ? 0L : getMinimumReasonableRetainedSeqNo();
         final Map<Boolean, List<RetentionLease>> partitionByExpiration = retentionLeases
                 .leases()
                 .stream()
                 .collect(Collectors.groupingBy(lease -> {
                     if (lease.source().equals(PEER_RECOVERY_RETENTION_LEASE_SOURCE)) {
+                        // 永不expire当前follower的lease
                         if (leaseIdsForCurrentPeers.contains(lease.id())) {
                             return false;
                         }
+
+                        // 这个可以用于衡量分片分配的过程，allShardsStarted为true，则表明当前线上的node已近
+                        // 完成了该shard的recovery过程。因此，对于尚未上线node上的allocation，没必要再为它的
+                        // 的recovery而等待（其他node都完成了recovery，而它们连这个shard都尚未assign，因为
+                        // 这些node可能永久宕机了），可以将它的lease清除。
                         if (allShardsStarted) {
                             logger.trace("expiring unused [{}]", lease);
                             return true;
                         }
+
+                        // 走到这里，说明当前存在assigned node处于recovery过程中。但当前lease对应的node还
+                        // 没有分配shard（可能这个node还没有启动），如果这个lease的retainingSeqNo落后太多，
+                        // 则同样清除。
                         if (lease.retainingSequenceNumber() < minimumReasonableRetainedSeqNo) {
                             logger.trace("expiring unreasonable [{}] retaining history before [{}]", lease, minimumReasonableRetainedSeqNo);
                             return true;
@@ -1222,9 +1233,16 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
     private static long computeGlobalCheckpoint(final Set<String> pendingInSync, final Collection<CheckpointState> localCheckpoints,
                                                 final long fallback) {
         long minLocalCheckpoint = Long.MAX_VALUE;
+
+        /**
+         * 这里的逻辑非常重要，在存在pending in-sync的replica时，不能继续推进global checkpoint。
+         * 因为继续推进global checkpoint的话，可能会导致那个replica的local checkpoint永远追不上
+         * 当前in-sync副本的global checkpoint，从而导致markAllocationIdAsInSync方法永远阻塞。
+         */
         if (pendingInSync.isEmpty() == false) {
             return fallback;
         }
+
         for (final CheckpointState cps : localCheckpoints) {
             if (cps.inSync) {
                 if (cps.localCheckpoint == SequenceNumbers.UNASSIGNED_SEQ_NO) {
