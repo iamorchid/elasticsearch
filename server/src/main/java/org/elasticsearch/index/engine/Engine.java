@@ -149,11 +149,13 @@ public abstract class Engine implements Closeable {
         this.store = engineConfig.getStore();
         // we use the engine class directly here to make sure all subclasses have the same logger name
         this.logger = Loggers.getLogger(Engine.class,
-                engineConfig.getShardId());
+            engineConfig.getShardId());
         this.eventListener = engineConfig.getEventListener();
     }
 
-    /** Returns 0 in the case where accountable is null, otherwise returns {@code ramBytesUsed()} */
+    /**
+     * Returns 0 in the case where accountable is null, otherwise returns {@code ramBytesUsed()}
+     */
     protected static long guardedRamBytesUsed(Accountable a) {
         if (a == null) {
             return 0;
@@ -171,10 +173,14 @@ public abstract class Engine implements Closeable {
         return new MergeStats();
     }
 
-    /** returns the history uuid for the engine */
+    /**
+     * returns the history uuid for the engine
+     */
     public abstract String getHistoryUUID();
 
-    /** Returns how many bytes we are currently moving from heap to disk */
+    /**
+     * Returns how many bytes we are currently moving from heap to disk
+     */
     public abstract long getWritingBytes();
 
     /**
@@ -215,7 +221,7 @@ public abstract class Engine implements Closeable {
         // when indexing but not refreshing in general. Yet, if a refresh happens the internal searcher is refresh as well so we are
         // safe here.
         try (Searcher searcher = acquireSearcher("docStats", SearcherScope.INTERNAL)) {
-           return docsStats(searcher.getIndexReader());
+            return docsStats(searcher.getIndexReader());
         }
     }
 
@@ -270,14 +276,18 @@ public abstract class Engine implements Closeable {
             return lock.acquire();
         }
 
-        /** Activate throttling, which switches the lock to be a real lock */
+        /**
+         * Activate throttling, which switches the lock to be a real lock
+         */
         public void activate() {
             assert lock == NOOP_LOCK : "throttling activated while already active";
             startOfThrottleNS = System.nanoTime();
             lock = lockReference;
         }
 
-        /** Deactivate throttling, which switches the lock to be an always-acquirable NoOpLock */
+        /**
+         * Deactivate throttling, which switches the lock to be an always-acquirable NoOpLock
+         */
         public void deactivate() {
             assert lock != NOOP_LOCK : "throttling deactivated but not active";
             lock = NOOP_LOCK;
@@ -294,7 +304,7 @@ public abstract class Engine implements Closeable {
         long getThrottleTimeInMillis() {
             long currentThrottleNS = 0;
             if (isThrottled() && startOfThrottleNS != 0) {
-                currentThrottleNS +=  System.nanoTime() - startOfThrottleNS;
+                currentThrottleNS += System.nanoTime() - startOfThrottleNS;
                 if (currentThrottleNS < 0) {
                     // Paranoia (System.nanoTime() is supposed to be monotonic): time slip must have happened, have to ignore this value
                     currentThrottleNS = 0;
@@ -315,17 +325,21 @@ public abstract class Engine implements Closeable {
 
     /**
      * Returns the <code>true</code> iff this engine is currently under index throttling.
+     *
      * @see #getIndexThrottleTimeInMillis()
      */
     public abstract boolean isThrottled();
 
     /**
      * Trims translog for terms below <code>belowTerm</code> and seq# above <code>aboveSeqNo</code>
+     *
      * @see Translog#trimOperations(long, long)
      */
     public abstract void trimOperationsFromTranslog(long belowTerm, long aboveSeqNo) throws EngineException;
 
-    /** A Lock implementation that always allows the lock to be acquired */
+    /**
+     * A Lock implementation that always allows the lock to be acquired
+     */
     protected static final class NoOpLock implements Lock {
 
         @Override
@@ -358,20 +372,22 @@ public abstract class Engine implements Closeable {
 
     /**
      * Perform document index operation on the engine
+     *
      * @param index operation to perform
      * @return {@link IndexResult} containing updated translog location, version and
      * document specific failures
-     *
+     * <p>
      * Note: engine level failures (i.e. persistent engine failures) are thrown
      */
     public abstract IndexResult index(Index index) throws IOException;
 
     /**
      * Perform document delete operation on the engine
+     *
      * @param delete operation to perform
      * @return {@link DeleteResult} containing updated translog location, version and
      * document specific failures
-     *
+     * <p>
      * Note: engine level failures (i.e. persistent engine failures) are thrown
      */
     public abstract DeleteResult delete(Delete delete) throws IOException;
@@ -425,12 +441,16 @@ public abstract class Engine implements Closeable {
             this.resultType = Type.MAPPING_UPDATE_REQUIRED;
         }
 
-        /** whether the operation was successful, has failed or was aborted due to a mapping update */
+        /**
+         * whether the operation was successful, has failed or was aborted due to a mapping update
+         */
         public Type getResultType() {
             return resultType;
         }
 
-        /** get the updated document version */
+        /**
+         * get the updated document version
+         */
         public long getVersion() {
             return version;
         }
@@ -456,17 +476,23 @@ public abstract class Engine implements Closeable {
             return requiredMappingUpdate;
         }
 
-        /** get the translog location after executing the operation */
+        /**
+         * get the translog location after executing the operation
+         */
         public Translog.Location getTranslogLocation() {
             return translogLocation;
         }
 
-        /** get document failure while executing the operation {@code null} in case of no failure */
+        /**
+         * get document failure while executing the operation {@code null} in case of no failure
+         */
         public Exception getFailure() {
             return failure;
         }
 
-        /** get total time in nanoseconds */
+        /**
+         * get total time in nanoseconds
+         */
         public long getTook() {
             return took;
         }
@@ -579,7 +605,7 @@ public abstract class Engine implements Closeable {
     }
 
     protected final GetResult getFromSearcher(Get get, BiFunction<String, SearcherScope, Engine.Searcher> searcherFactory,
-                                                SearcherScope scope) throws EngineException {
+                                              SearcherScope scope) throws EngineException {
         final Engine.Searcher searcher = searcherFactory.apply("get", scope);
         final DocIdAndVersion docIdAndVersion;
         try {
@@ -594,7 +620,7 @@ public abstract class Engine implements Closeable {
             if (get.versionType().isVersionConflictForReads(docIdAndVersion.version, get.version())) {
                 Releasables.close(searcher);
                 throw new VersionConflictEngineException(shardId, get.id(),
-                        get.versionType().explainConflictForReads(docIdAndVersion.version, get.version()));
+                    get.versionType().explainConflictForReads(docIdAndVersion.version, get.version()));
             }
             if (get.getIfSeqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO && (
                 get.getIfSeqNo() != docIdAndVersion.seqNo || get.getIfPrimaryTerm() != docIdAndVersion.primaryTerm
@@ -624,7 +650,6 @@ public abstract class Engine implements Closeable {
      * safe manner, preferably in a try/finally block.
      *
      * @param source the source API or routing that triggers this searcher acquire
-     *
      * @see Searcher#close()
      */
     public final Searcher acquireSearcher(String source) throws EngineException {
@@ -637,8 +662,7 @@ public abstract class Engine implements Closeable {
      * safe manner, preferably in a try/finally block.
      *
      * @param source the source API or routing that triggers this searcher acquire
-     * @param scope the scope of this searcher ie. if the searcher will be used for get or search purposes
-     *
+     * @param scope  the scope of this searcher ie. if the searcher will be used for get or search purposes
      * @see Searcher#close()
      */
     public Searcher acquireSearcher(String source, SearcherScope scope) throws EngineException {
@@ -657,19 +681,19 @@ public abstract class Engine implements Closeable {
             Searcher engineSearcher = new Searcher(source, acquire,
                 engineConfig.getSimilarity(), engineConfig.getQueryCache(), engineConfig.getQueryCachingPolicy(),
                 () -> {
-                if (released.compareAndSet(false, true)) {
-                    try {
-                        referenceManager.release(acquire);
-                    } finally {
-                        store.decRef();
+                    if (released.compareAndSet(false, true)) {
+                        try {
+                            referenceManager.release(acquire);
+                        } finally {
+                            store.decRef();
+                        }
+                    } else {
+                        /* In general, readers should never be released twice or this would break reference counting. There is one rare case
+                         * when it might happen though: when the request and the Reaper thread would both try to release it in a very short
+                         * amount of time, this is why we only log a warning instead of throwing an exception. */
+                        logger.warn("Searcher was released twice", new IllegalStateException("Double release"));
                     }
-                } else {
-                    /* In general, readers should never be released twice or this would break reference counting. There is one rare case
-                     * when it might happen though: when the request and the Reaper thread would both try to release it in a very short
-                     * amount of time, this is why we only log a warning instead of throwing an exception. */
-                    logger.warn("Searcher was released twice", new IllegalStateException("Double release"));
-                }
-              });
+                });
             releasable = null; // success - hand over the reference to the engine reader
             return engineSearcher;
         } catch (AlreadyClosedException ex) {
@@ -751,7 +775,9 @@ public abstract class Engine implements Closeable {
         ensureOpen(null);
     }
 
-    /** get commits stats for the last commit */
+    /**
+     * get commits stats for the last commit
+     */
     public final CommitStats commitStats() {
         return new CommitStats(getLastCommittedSegmentInfos());
     }
@@ -894,20 +920,22 @@ public abstract class Engine implements Closeable {
         stats.addIndexWriterMemoryInBytes(0);
     }
 
-    /** How much heap is used that would be freed by a refresh.  Note that this may throw {@link AlreadyClosedException}. */
+    /**
+     * How much heap is used that would be freed by a refresh.  Note that this may throw {@link AlreadyClosedException}.
+     */
     public abstract long getIndexBufferRAMBytesUsed();
 
     final Segment[] getSegmentInfo(SegmentInfos lastCommittedSegmentInfos, boolean verbose) {
         ensureOpen();
         Map<String, Segment> segments = new HashMap<>();
         // first, go over and compute the search ones...
-        try (Searcher searcher = acquireSearcher("segments", SearcherScope.EXTERNAL)){
+        try (Searcher searcher = acquireSearcher("segments", SearcherScope.EXTERNAL)) {
             for (LeafReaderContext ctx : searcher.getIndexReader().getContext().leaves()) {
                 fillSegmentInfo(Lucene.segmentReader(ctx.reader()), verbose, true, segments);
             }
         }
 
-        try (Searcher searcher = acquireSearcher("segments", SearcherScope.INTERNAL)){
+        try (Searcher searcher = acquireSearcher("segments", SearcherScope.INTERNAL)) {
             for (LeafReaderContext ctx : searcher.getIndexReader().getContext().leaves()) {
                 SegmentReader segmentReader = Lucene.segmentReader(ctx.reader());
                 if (segments.containsKey(segmentReader.getSegmentName()) == false) {
@@ -1076,7 +1104,7 @@ public abstract class Engine implements Closeable {
      * Triggers a forced merge on this engine
      */
     public abstract void forceMerge(boolean flush, int maxNumSegments, boolean onlyExpungeDeletes,
-                                        boolean upgrade, boolean upgradeOnlyAncientSegments) throws EngineException, IOException;
+                                    boolean upgrade, boolean upgradeOnlyAncientSegments) throws EngineException, IOException;
 
     /**
      * Snapshots the most recent index and returns a handle to it. If needed will try and "commit" the
@@ -1175,7 +1203,9 @@ public abstract class Engine implements Closeable {
         }
     }
 
-    /** Check whether the engine should be failed */
+    /**
+     * Check whether the engine should be failed
+     */
     protected boolean maybeFailEngine(String source, Exception e) {
         if (Lucene.isCorruptionException(e)) {
             failEngine("corrupt file (source: [" + source + "])", e);
@@ -1237,7 +1267,9 @@ public abstract class Engine implements Closeable {
 
     public abstract static class Operation {
 
-        /** type of operation (index, delete), subclasses use static types */
+        /**
+         * type of operation (index, delete), subclasses use static types
+         */
         public enum TYPE {
             INDEX, DELETE, NO_OP;
 
@@ -1337,7 +1369,7 @@ public abstract class Engine implements Closeable {
             super(uid, seqNo, primaryTerm, version, versionType, origin, startTime);
             assert (origin == Origin.PRIMARY) == (versionType != null) : "invalid version_type=" + versionType + " for origin=" + origin;
             assert ifPrimaryTerm >= 0 : "ifPrimaryTerm [" + ifPrimaryTerm + "] must be non negative";
-            assert ifSeqNo == UNASSIGNED_SEQ_NO || ifSeqNo >=0 :
+            assert ifSeqNo == UNASSIGNED_SEQ_NO || ifSeqNo >= 0 :
                 "ifSeqNo [" + ifSeqNo + "] must be non negative or unset";
             assert (origin == Origin.PRIMARY) || (ifSeqNo == UNASSIGNED_SEQ_NO && ifPrimaryTerm == UNASSIGNED_PRIMARY_TERM) :
                 "cas operations are only allowed if origin is primary. get [" + origin + "]";
@@ -1425,7 +1457,7 @@ public abstract class Engine implements Closeable {
             super(uid, seqNo, primaryTerm, version, versionType, origin, startTime);
             assert (origin == Origin.PRIMARY) == (versionType != null) : "invalid version_type=" + versionType + " for origin=" + origin;
             assert ifPrimaryTerm >= 0 : "ifPrimaryTerm [" + ifPrimaryTerm + "] must be non negative";
-            assert ifSeqNo == UNASSIGNED_SEQ_NO || ifSeqNo >=0 :
+            assert ifSeqNo == UNASSIGNED_SEQ_NO || ifSeqNo >= 0 :
                 "ifSeqNo [" + ifSeqNo + "] must be non negative or unset";
             assert (origin == Origin.PRIMARY) || (ifSeqNo == UNASSIGNED_SEQ_NO && ifPrimaryTerm == UNASSIGNED_PRIMARY_TERM) :
                 "cas operations are only allowed if origin is primary. get [" + origin + "]";
@@ -1441,7 +1473,7 @@ public abstract class Engine implements Closeable {
 
         public Delete(Delete template, VersionType versionType) {
             this(template.id(), template.uid(), template.seqNo(), template.primaryTerm(), template.version(),
-                    versionType, template.origin(), template.startTime(), UNASSIGNED_SEQ_NO, 0);
+                versionType, template.origin(), template.startTime(), UNASSIGNED_SEQ_NO, 0);
         }
 
         @Override
@@ -1757,6 +1789,7 @@ public abstract class Engine implements Closeable {
     /**
      * Fills up the local checkpoints history with no-ops until the local checkpoint
      * and the max seen sequence ID are identical.
+     *
      * @param primaryTerm the shards primary term this engine was created for
      * @return the number of no-ops added
      */

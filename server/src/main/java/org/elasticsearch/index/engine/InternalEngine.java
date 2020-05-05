@@ -251,8 +251,7 @@ public class InternalEngine extends Engine {
             this.internalReaderManager.addListener(lastRefreshedCheckpointListener);
             maxSeqNoOfUpdatesOrDeletes = new AtomicLong(SequenceNumbers.max(localCheckpointTracker.getMaxSeqNo(), translog.getMaxSeqNo()));
             if (localCheckpointTracker.getPersistedCheckpoint() < localCheckpointTracker.getMaxSeqNo()) {
-                try (Searcher searcher =
-                         acquireSearcher("restore_version_map_and_checkpoint_tracker", SearcherScope.INTERNAL)) {
+                try (Searcher searcher = acquireSearcher("restore_version_map_and_checkpoint_tracker", SearcherScope.INTERNAL)) {
                     /**
                      * 在了解version map具体细节之前，考虑下一个这样的问题。primary向某个replica同步一个文档的创建和删除操作，即
                      * INDEX(version=1)和DELETE(version=2)。假设因为收到的请求乱序，replica先收到DELETE，后收到Index，怎么保证

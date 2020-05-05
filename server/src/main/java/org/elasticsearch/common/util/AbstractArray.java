@@ -29,7 +29,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 abstract class AbstractArray implements BigArray {
 
     private final BigArrays bigArrays;
+
+    /**
+     * 对于从pagecache分配的page，是否需要进行clear操作。这个仅对byte, int, long
+     * 类型的page其作用，对于object类型的page，在recycle（即page被回收时），引用
+     * 就必须清理掉（见PageCacheRecycler中objectPage初始化）。
+     */
     public final boolean clearOnResize;
+
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     AbstractArray(BigArrays bigArrays, boolean clearOnResize) {

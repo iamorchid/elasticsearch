@@ -141,7 +141,10 @@ public class PageCacheRecycler {
             }
             @Override
             public void recycle(Object[] value) {
-                Arrays.fill(value, null); // we need to remove the strong refs on the objects stored in the array
+                // 注意，这里是在recycle时（即cache不再使用时）就将进行必须的clear操作，而非像byte, int, long类型的page
+                // 那样，可以由调用者自定义是否需要在复用page时进行clear操作。否则，object的引用不清楚，将会导致不再使用
+                // 的object对象不能被及时GC掉，从而造成内存泄露
+                Arrays.fill(value, null);
             }
         });
 

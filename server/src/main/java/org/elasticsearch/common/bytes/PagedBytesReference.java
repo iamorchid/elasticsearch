@@ -73,6 +73,9 @@ public class PagedBytesReference extends AbstractBytesReference {
         return bref;
     }
 
+    /**
+     * 为了保证效率，这个函数需要避免数据的拷贝，其实现方式极为高效
+     */
     @Override
     public final BytesRefIterator iterator() {
         final int offset = this.offset;
@@ -92,7 +95,10 @@ public class PagedBytesReference extends AbstractBytesReference {
             public BytesRef next() throws IOException {
                 if (nextFragmentSize != 0) {
                     final boolean materialized = byteArray.get(offset + position, nextFragmentSize, slice);
+
+                    // materialized为true时，表示进行数据拷贝，这个发生在请求的数据不在一个page中，这是需要避免的
                     assert materialized == false : "iteration should be page aligned but array got materialized";
+
                     position += nextFragmentSize;
                     final int remaining = length - position;
                     nextFragmentSize = Math.min(remaining, PAGE_SIZE);

@@ -469,6 +469,7 @@ public class BigArrays {
             final Recycler.V<byte[]> page = recycler.bytePage(clearOnResize);
             return validate(new ByteArrayWrapper(this, page.v(), size, page, clearOnResize));
         } else {
+            // 对于size比较小的array，为何先分配对象然后再使用circuit breaker进行check？
             return validate(new ByteArrayWrapper(this, new byte[(int) size], size, null, clearOnResize));
         }
     }
@@ -754,6 +755,7 @@ public class BigArrays {
             final Recycler.V<Object[]> page = recycler.objectPage();
             return validate(new ObjectArrayWrapper<>(this, page.v(), size, page));
         } else {
+            // 对于size比较小的array，为何先分配对象然后再使用circuit breaker进行check？
             return validate(new ObjectArrayWrapper<>(this, new Object[(int) size], size, null));
         }
     }
